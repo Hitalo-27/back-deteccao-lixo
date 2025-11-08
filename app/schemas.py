@@ -36,3 +36,21 @@ class AddressBase(BaseModel):
     pais: str
     estado: str
     cidade: str
+
+class LixoBase(BaseModel):
+    data: datetime
+    imagem: str
+    latitude: str
+    longitude: str
+    endereco_id: int
+    user_id: int
+
+class LixoResponse(BaseModel):
+    data: datetime
+    imagem: str
+    latitude: str
+    longitude: str
+    endereco: AddressBase
+    user: UserResponse
+    class Config:
+        from_attributes = True

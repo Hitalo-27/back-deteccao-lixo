@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from .routes import imageIdentification
 from .database import Base, engine
 from .routes import users
-from .routes import infracoes
+from .routes import lixo
 
 # Criar tabelas no banco
 Base.metadata.create_all(bind=engine)
@@ -26,7 +26,7 @@ app.add_middleware(
 
 # Registrar rotas
 app.include_router(users.router)
-app.include_router(infracoes.router)
+app.include_router(lixo.router)
 app.include_router(imageIdentification.router)
 
 @app.get("/")
