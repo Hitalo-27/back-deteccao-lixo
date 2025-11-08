@@ -1,0 +1,6 @@
+# Byte-compiled / cache
+__pycache__/
+.env
+AccessALPR/detector/alpr-weights.zip
+AccessALPR/weights/detector-w.pth
+AccessALPR/venv
