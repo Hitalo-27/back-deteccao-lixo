@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordBearer
 from .. import schemas, models, auth
 from ..database import get_db
 import os
 import shutil
 from datetime import datetime
 
-
 UPLOAD_DIR = "app/uploads"
 UPLOAD_DIR_RELATIVE = "uploads"
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.post("/register", response_model=schemas.UserResponse)
+@router.post("/register")
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
@@ -27,7 +29,16 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+    
+    payload = {
+        "sub": str(new_user.id), 
+        "email": new_user.email,
+        "name": user.username
+    }
+    
+    token = auth.create_access_token(payload)
+    
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/login")
@@ -35,8 +46,15 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if not db_user or not auth.verify_password(user.password, db_user.password):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    
+    payload = {
+        "sub": str(db_user.id), 
+        "email": db_user.email,
+        "name": db_user.username
+    }
 
-    token = auth.create_access_token({"sub": db_user.email})
+    token = auth.create_access_token(payload)
+    
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -61,7 +79,8 @@ async def update_user(
     current_email: str = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    user = db.query(models.User).filter(models.User.email == current_email).first()
+    print(current_email.email)
+    user = db.query(models.User).filter(models.User.email == current_email.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
@@ -107,3 +126,12 @@ async def update_user(
     db.refresh(user)
 
     return {"message": "Usuário atualizado com sucesso", "image_url": user.image_url if image else None}
+
+@router.get("/get-user")
+def get_me(token_data: auth.TokenData = Depends(auth.get_current_user)):
+
+    print(f"ID do usuário: {token_data.id}")
+    print(f"Email do usuário: {token_data.email}")
+    
+    # Esta rota deve retornar os dados do usuário, não o token
+    return token_data
