@@ -33,7 +33,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     payload = {
         "sub": str(new_user.id), 
         "email": new_user.email,
-        "name": user.username
+        "name": user.username,
+        "image": ''
     }
     
     token = auth.create_access_token(payload)
@@ -50,7 +51,8 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     payload = {
         "sub": str(db_user.id), 
         "email": db_user.email,
-        "name": db_user.username
+        "name": db_user.username,
+        "image": db_user.image_url
     }
 
     token = auth.create_access_token(payload)
@@ -125,7 +127,16 @@ async def update_user(
     db.commit()
     db.refresh(user)
 
-    return {"message": "Usuário atualizado com sucesso", "image_url": user.image_url if image else None}
+    payload = {
+        "sub": str(user.id), 
+        "email": user.email,
+        "name": user.username,
+        "image": user.image_url
+    }
+    
+    token = auth.create_access_token(payload)
+
+    return {"message": "Usuário atualizado com sucesso", "image_url": user.image_url if image else None, "access_token": token}
 
 @router.get("/get-user")
 def get_me(token_data: auth.TokenData = Depends(auth.get_current_user)):

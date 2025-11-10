@@ -19,7 +19,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Config JWT
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Para extrair token do header Authorization: Bearer <token>
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
@@ -31,6 +31,7 @@ class TokenData(BaseModel):
     id: str   # O ID do usuário (vindo do 'sub')
     email: EmailStr # O email do usuário (vindo do 'email')
     name: str 
+    image: str
 
 
 def hash_password(password: str) -> str:
@@ -61,13 +62,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
         user_id: str = payload.get("sub")
         user_email: str = payload.get("email")
         user_name: str = payload.get("name")
+        user_image: str = payload.get("image")
 
         # Verificamos se ambos existem
         if user_id is None or user_email is None or user_name is None:
             raise credentials_exception
         
         # Validamos os dados usando o schema Pydantic
-        token_data = TokenData(id=user_id, email=user_email, name=user_name)
+        token_data = TokenData(id=user_id, email=user_email, name=user_name, image=user_image)
 
     except JWTError:
         raise credentials_exception
