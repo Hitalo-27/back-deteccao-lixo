@@ -32,17 +32,17 @@ class UserUpdate(BaseModel):
     new_password: Optional[str] = None
     new_password_confirm: Optional[str] = None
 
-class AddressBase(BaseModel):
-    pais: str
-    estado: str
-    cidade: str
-
 class LixoBase(BaseModel):
     data: datetime
     imagem: str
     latitude: str
     longitude: str
-    endereco_id: int
+    rua: str
+    numero: Optional[int] = None
+    cidade: str
+    estado: str
+    pais: str
+    cep: str
     user_id: int
 
 class LixoResponse(BaseModel):
@@ -50,7 +50,12 @@ class LixoResponse(BaseModel):
     imagem: str
     latitude: str
     longitude: str
-    endereco: AddressBase
+    rua: str
+    numero: Optional[int] = None
+    cidade: str
+    estado: str
+    pais: str
+    cep: str
     user: UserResponse
     class Config:
         from_attributes = True

@@ -11,14 +11,6 @@ class User(Base):
     password = Column(String(255), nullable=False)
     image_url = Column(String, nullable=True)
 
-class Address(Base):
-    __tablename__ = "endereco"
-
-    id = Column(Integer, primary_key=True, index=True)
-    pais = Column(String(45), index=True, nullable=False)
-    estado = Column(String(80), index=True, nullable=False)
-    cidade = Column(String(80), index=True, nullable=False)
-
 class Lixo(Base):
     __tablename__ = "lixo"
 
@@ -27,7 +19,11 @@ class Lixo(Base):
     imagem = Column(String(255), nullable=False)
     latitude = Column(String(20), nullable=True)
     longitude = Column(String(20), nullable=True)
-    endereco_id = Column(Integer, ForeignKey("endereco.id"), nullable=False)
-    endereco = relationship("Address") 
+    rua = Column(String(255), nullable=True)
+    numero = Column(Integer, nullable=True)
+    cidade = Column(String(100), nullable=True)
+    estado = Column(String(2), nullable=True)
+    pais = Column(String(50), nullable=True)
+    cep = Column(String(9), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User")

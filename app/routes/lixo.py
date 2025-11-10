@@ -41,20 +41,20 @@ def registrar_lixo(
     user = db.query(models.User).filter(models.User.id == lixo.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
-    # Verifica se o endereço existe
-    endereco = db.query(models.Address).filter(models.Address.id == lixo.endereco_id).first()
-    if not endereco:
-        raise HTTPException(status_code=404, detail="Endereço não encontrado")
-
+    
     # Cria novo registro de lixo
     novo_lixo = models.Lixo(
         data=lixo.data,
         imagem=lixo.imagem,
         latitude=lixo.latitude,
         longitude=lixo.longitude,
+        rua=lixo.rua,
+        numero=lixo.numero,
+        cidade=lixo.cidade,
+        estado=lixo.estado,
+        pais=lixo.pais,
+        cep=lixo.cep,
         user_id=lixo.user_id,
-        endereco_id=lixo.endereco_id
     )
 
     # Salva no banco
