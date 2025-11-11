@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlalchemy.orm import Session
 from .. import schemas, models, auth
 from ..database import get_db
@@ -6,8 +7,12 @@ from datetime import datetime
 from typing import List
 import os
 import requests
+from app.utils.image_metadata import extract_image_metadata
+from app.utils.detectar_lixo import detectar_lixo
 
 UPLOAD_DIR = "app/uploads"
+UPLOAD_DIR_RELATIVE = "uploads"
+UPLOAD_DIR_RELATIVE_DETECTED = "detect/detected_"
 DETECTED_DIR = "app/detect"
 ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY")
 MODEL_ID = "lixo-com-impacto-ambiental/1"
@@ -31,42 +36,79 @@ def consultar_lixo(
 
     return lixo
 
-@router.post("/registrar", response_model=schemas.LixoBase)
-def registrar_lixo(
-    lixo: schemas.LixoBase,
-    current_user: str = Depends(auth.get_current_user),  # autenticação opcional
-    db: Session = Depends(get_db),
+@router.post("/registrar")
+async def registrar(
+    image: UploadFile = File(...),
+    current_email: str = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
 ):
-    # Verifica se o usuário existe
-    user = db.query(models.User).filter(models.User.id == lixo.user_id).first()
+    # Busca usuário autenticado
+    user = db.query(models.User).filter(models.User.email == current_email.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    # Cria novo registro de lixo
+
+    # Cria diretório de upload se não existir
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    # Define nome único de arquivo
+    ext = os.path.splitext(image.filename)[1]
+    new_filename = f"lixo_{user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+    file_path = os.path.join(UPLOAD_DIR, new_filename)
+
+    # Salva imagem
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    # Extrai metadados
+    try:
+        metadata = extract_image_metadata(new_filename, base_dir=UPLOAD_DIR)
+    except Exception as e:
+        metadata = {"erro": str(e)}
+
+    gps = metadata.get("gps") or {}
+    local = metadata.get("local", {}) or {}
+    metadados = metadata.get("metadados", {})
+    latitude = gps.get("latitude")
+    longitude = gps.get("longitude")
+
+    # === 🚀 Detectar lixo antes de salvar ===
+    resultado = detectar_lixo(new_filename)
+
+    if resultado["detections_validas"] == 0:
+        # Nenhum lixo detectado → não salva no banco
+        return {
+            "success": 0,
+            "message": "Nenhum lixo detectado na imagem.",
+            "lixo": []
+        }
+
+    # === ✅ Salva no banco apenas se detectou ===
     novo_lixo = models.Lixo(
-        data=lixo.data,
-        imagem=lixo.imagem,
-        latitude=lixo.latitude,
-        longitude=lixo.longitude,
-        rua=lixo.rua,
-        numero=lixo.numero,
-        cidade=lixo.cidade,
-        estado=lixo.estado,
-        pais=lixo.pais,
-        cep=lixo.cep,
-        user_id=lixo.user_id,
+        data=metadados.get("DateTime"),
+        imagem=f"/{UPLOAD_DIR_RELATIVE_DETECTED}{new_filename}",
+        latitude=latitude,
+        longitude=longitude,
+        rua=local.get("rua"),
+        numero=local.get("numero"),
+        cidade=local.get("cidade"),
+        estado=local.get("estado"),
+        pais=local.get("pais"),
+        cep=local.get("cep"),
+        user_id=user.id,
     )
 
-    # Salva no banco
     db.add(novo_lixo)
     db.commit()
     db.refresh(novo_lixo)
 
-    return novo_lixo
-
+    return {
+        "success": 1,
+        "message": "Lixo registrado com sucesso.",
+        "lixo": novo_lixo,
+    }
 
 @router.post("/detectar")
-async def detectar_lixo(
+async def detectar_lixo_API(
     filename: str = Body(..., embed=True),
     db: Session = Depends(get_db),
     current_email: str = Depends(auth.get_current_user)
@@ -161,7 +203,7 @@ async def detectar_lixo(
         raise HTTPException(status_code=500, detail=f"Erro ao processar imagem: {e}")
     
 @router.post("/detectarOG")
-async def detectar_lixo(
+async def detectar_lixo_API(
     filename: str = Body(..., embed=True),
     db: Session = Depends(get_db),
     current_email: str = Depends(auth.get_current_user)
