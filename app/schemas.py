@@ -46,16 +46,16 @@ class LixoBase(BaseModel):
     user_id: Optional[int] = None
 
 class LixoResponse(BaseModel):
-    data: datetime
-    imagem: str
-    latitude: str
-    longitude: str
-    rua: str
+    data: Optional[datetime] = None
+    imagem: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    rua: Optional[str] = None
     numero: Optional[int] = None
-    cidade: str
-    estado: str
-    pais: str
-    cep: str
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    pais: Optional[str] = None
+    cep: Optional[str] = None
     user: UserResponse
     class Config:
         from_attributes = True
