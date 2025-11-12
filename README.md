@@ -1,4 +1,4 @@
-# 🚀 Backend Completo - TCC (FastAPI + MySQL)
+# 🚀 Backend Completo - EcoDetect (FastAPI + MySQL)
 
 Este é o **backend completo** do projeto desenvolvido em **Python** utilizando **FastAPI**.  
 Ele fornece uma **API REST** para todas as funcionalidades do sistema.
@@ -22,7 +22,7 @@ git clone <URL_DO_REPOSITORIO>
 cd <NOME_DA_PASTA_CLONADA>
 ```
 
-2. Crie o banco de dados MySQL com o arquivo `schema.sql`:
+2. Crie o banco de dados MySQL com o arquivo `ecodetect.sql`.
 
 3. Instale as dependências:
 ```bash
