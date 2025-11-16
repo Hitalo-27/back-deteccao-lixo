@@ -42,70 +42,112 @@ async def registrar(
     current_email: str = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Busca usuário autenticado
-    user = db.query(models.User).filter(models.User.email == current_email.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    # Cria diretório de upload se não existir
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    # Define nome único de arquivo
-    ext = os.path.splitext(image.filename)[1]
-    new_filename = f"lixo_{user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, new_filename)
-
-    # Salva imagem
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-
-    # Extrai metadados
     try:
-        metadata = extract_image_metadata(new_filename, base_dir=UPLOAD_DIR)
-    except Exception as e:
-        metadata = {"erro": str(e)}
+        # --- Validar tipo de arquivo ---
+        if not image.filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            return {
+                "success": 0,
+                "message": "Formato de arquivo não suportado. Envie JPG ou PNG."
+            }
 
-    gps = metadata.get("gps") or {}
-    local = metadata.get("local", {}) or {}
-    metadados = metadata.get("metadados", {})
-    latitude = gps.get("latitude")
-    longitude = gps.get("longitude")
+        # --- Buscar usuário ---
+        user = db.query(models.User).filter(models.User.email == current_email.email).first()
+        if not user:
+            return {"success": 0, "message": "Usuário não encontrado."}
 
-    # === 🚀 Detectar lixo antes de salvar ===
-    resultado = detectar_lixo(new_filename)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    if resultado["detections_validas"] == 0:
-        # Nenhum lixo detectado → não salva no banco
+        ext = os.path.splitext(image.filename)[1]
+        new_filename = f"lixo_{user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+        file_path = os.path.join(UPLOAD_DIR, new_filename)
+
+        # --- Salvar arquivo ---
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+        except Exception:
+            return {
+                "success": 0,
+                "message": "Falha ao salvar o arquivo. Envie outra imagem."
+            }
+
+        # --- Extrair metadados ---
+        try:
+            metadata = extract_image_metadata(new_filename, base_dir=UPLOAD_DIR)
+        except Exception:
+            metadata = {}
+            # Não quebra — apenas avisa
+            metadados_ok = False
+        else:
+            metadados_ok = True
+
+        gps = metadata.get("gps") or {}
+        local = metadata.get("local") or {}
+        metadados = metadata.get("metadados") or {}
+
+        # --- Tentar extrair latitude/longitude ---
+        try:
+            latitude = gps.get("latitude")
+            longitude = gps.get("longitude")
+        except Exception:
+            latitude = None
+            longitude = None
+
+        # --- Rodar detecção de lixo ---
+        try:
+            resultado = detectar_lixo(new_filename)
+        except Exception:
+            return {
+                "success": 0,
+                "message": "Erro durante análise da imagem. Ela pode estar corrompida ou ilegível."
+            }
+
+        if resultado.get("detections_validas", 0) == 0:
+            return {
+                "success": 0,
+                "message": "Nenhum lixo detectado na imagem."
+            }
+
+        # --- Salvar no banco ---
+        try:
+            novo_lixo = models.Lixo(
+                data=metadados.get("DateTime") if metadados_ok else None,
+                imagem=f"/{UPLOAD_DIR_RELATIVE_DETECTED}{new_filename}",
+                latitude=latitude,
+                longitude=longitude,
+                rua=local.get("rua"),
+                numero=local.get("numero"),
+                cidade=local.get("cidade"),
+                estado=local.get("estado"),
+                pais=local.get("pais"),
+                cep=local.get("cep"),
+                user_id=user.id,
+            )
+
+            db.add(novo_lixo)
+            db.commit()
+            db.refresh(novo_lixo)
+        except Exception:
+            return {
+                "success": 0,
+                "message": "Erro ao salvar no banco de dados."
+            }
+
+        # --- Sucesso ---
         return {
-            "success": 0,
-            "message": "Nenhum lixo detectado na imagem.",
-            "lixo": []
+            "success": 1,
+            "message": "Lixo registrado com sucesso.",
+            "lixo": novo_lixo
         }
 
-    # === ✅ Salva no banco apenas se detectou ===
-    novo_lixo = models.Lixo(
-        data=metadados.get("DateTime"),
-        imagem=f"/{UPLOAD_DIR_RELATIVE_DETECTED}{new_filename}",
-        latitude=latitude,
-        longitude=longitude,
-        rua=local.get("rua"),
-        numero=local.get("numero"),
-        cidade=local.get("cidade"),
-        estado=local.get("estado"),
-        pais=local.get("pais"),
-        cep=local.get("cep"),
-        user_id=user.id,
-    )
-
-    db.add(novo_lixo)
-    db.commit()
-    db.refresh(novo_lixo)
-
-    return {
-        "success": 1,
-        "message": "Lixo registrado com sucesso.",
-        "lixo": novo_lixo,
-    }
+    except Exception as e:
+        # Fallback para qualquer erro inesperado
+        return {
+            "success": 0,
+            "message": "Erro interno inesperado. Envie outra imagem ou tente novamente.",
+            "detalhe_tecnico": str(e)  # opcional — remova se não quiser mostrar
+        }
 
 @router.post("/detectar")
 async def detectar_lixo_API(
