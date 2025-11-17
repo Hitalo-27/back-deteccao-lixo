@@ -24,12 +24,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 router = APIRouter(prefix="/lixo", tags=["lixo"])
 @router.get("/consultar", response_model=List[schemas.LixoResponse])
 def consultar_lixo(
-    user: int,
     # current_email: str = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
     
-    lixo = db.query(models.Lixo).filter(models.Lixo.user_id == user).all()
+    lixo = db.query(models.Lixo).all()
 
     if not lixo:
         raise HTTPException(status_code=404, detail="Nenhum lixo encontrado")
