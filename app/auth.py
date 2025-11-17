@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import os
 from dotenv import load_dotenv
+from typing import Optional
 
 # --- NOVAS IMPORTAÇÕES ---
 from pydantic import BaseModel, EmailStr
@@ -31,7 +32,7 @@ class TokenData(BaseModel):
     id: str   # O ID do usuário (vindo do 'sub')
     email: EmailStr # O email do usuário (vindo do 'email')
     name: str 
-    image: str
+    image: Optional[str] = None
 
 
 def hash_password(password: str) -> str:
@@ -62,7 +63,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
         user_id: str = payload.get("sub")
         user_email: str = payload.get("email")
         user_name: str = payload.get("name")
-        user_image: str = payload.get("image")
+        user_image: str = payload.get("image", None)
 
         # Verificamos se ambos existem
         if user_id is None or user_email is None or user_name is None:
